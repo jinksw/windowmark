@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <PlatformTarget>x64</PlatformTarget>
+    <AssemblyName>WindowMark</AssemblyName>
+    <RootNamespace>WindowMark</RootNamespace>
+    <AssemblyTitle>WindowMark</AssemblyTitle>
+    <Product>WindowMark</Product>
+    <Description>Add custom, click-through labels to Windows application windows.</Description>
+    <Authors>WindowMark contributors</Authors>
+    <Copyright>Copyright © 2026 WindowMark contributors</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <Version>0.1.0</Version>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <NoWarn>$(NoWarn);WFAC010</NoWarn>
+  </PropertyGroup>
+
+</Project>

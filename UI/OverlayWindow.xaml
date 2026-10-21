@@ -1,0 +1,33 @@
+<Window x:Class="WindowMark.UI.OverlayWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="WindowMarkOverlay"
+        SizeToContent="WidthAndHeight"
+        WindowStartupLocation="Manual"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ShowInTaskbar="False"
+        ShowActivated="False"
+        Focusable="False"
+        ResizeMode="NoResize"
+        Topmost="False"
+        Left="-12000"
+        Top="-12000"
+        FontFamily="Microsoft YaHei UI, Segoe UI"
+        TextOptions.TextFormattingMode="Display"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True">
+    <Border x:Name="Chip"
+            CornerRadius="7"
+            Padding="9,2,10,3"
+            BorderThickness="1"
+            BorderBrush="#30000000">
+        <TextBlock x:Name="LabelText"
+                   FontSize="12"
+                   FontWeight="SemiBold"
+                   MaxWidth="220"
+                   TextTrimming="CharacterEllipsis"
+                   SnapsToDevicePixels="True" />
+    </Border>
+</Window>
