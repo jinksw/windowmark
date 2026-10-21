@@ -7,6 +7,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Threading;
 using WindowMark.Core;
 using WindowMark.Native;
 using Drawing = System.Drawing;
@@ -23,8 +24,20 @@ internal enum LabelEditorAction
 
 public partial class LabelEditorWindow : Window
 {
+    private static readonly Color UnselectedSwatchBorder = Color.FromArgb(0x30, 0xFF, 0xFF, 0xFF);
+    private static readonly Brush RainbowSwatch = CreateRainbowBrush();
+
     private readonly Dictionary<string, Border> _swatches = new(StringComparer.OrdinalIgnoreCase);
+    private Border _customSwatch = null!;
+    private Border _customHole = null!;
+    private TextBlock _customPlus = null!;
     private string _selectedColor = Palette.Colors[0];
+    private string? _customColor;
+    private bool _customSelected;
+    private double _hue = 45;
+    private double _saturation = 0.65;
+    private double _value = 1;
+    private bool _suppressHexChange;
     private bool _positioned;
 
     internal LabelEditorAction Action { get; private set; } = LabelEditorAction.Cancel;
@@ -37,12 +50,9 @@ public partial class LabelEditorWindow : Window
 
         TargetText.Text = $"{GetAppName(target)}  ·  {target.NativeTitle}";
         LabelBox.Text = existing?.Label ?? "";
-        string initialColor = existing != null && Palette.Colors.Contains(existing.Color, StringComparer.OrdinalIgnoreCase)
-            ? existing.Color
-            : defaultColor;
 
         BuildSwatches();
-        SelectColor(initialColor);
+        InitializeSelection(existing, defaultColor);
         DeleteButton.Visibility = existing != null ? Visibility.Visible : Visibility.Collapsed;
 
         CloseButton.Click += (_, _) => Cancel();
@@ -89,42 +99,391 @@ public partial class LabelEditorWindow : Window
     {
         foreach (string hex in Palette.Colors)
         {
-            var color = Palette.Parse(hex);
-            var swatch = new Border
-            {
-                Width = 26,
-                Height = 26,
-                CornerRadius = new CornerRadius(13),
-                Background = new SolidColorBrush(color),
-                BorderThickness = new Thickness(2),
-                BorderBrush = new SolidColorBrush(Color.FromArgb(0x30, 0xFF, 0xFF, 0xFF))
-            };
+            var swatch = CreateSwatch();
+            swatch.Background = new SolidColorBrush(Palette.Parse(hex));
             var button = new Button
             {
                 Content = swatch,
                 Tag = hex,
-                Style = (Style)FindResource("SwatchButton")
+                Style = (Style)FindResource("SwatchButton"),
+                ToolTip = hex
             };
-            button.Click += (_, _) => SelectColor(hex);
+            button.Click += (_, _) => SelectBuiltIn(hex);
             Swatches.Children.Add(button);
             _swatches[hex] = swatch;
         }
+
+        _customHole = new Border
+        {
+            Width = 14,
+            Height = 14,
+            CornerRadius = new CornerRadius(7),
+            Background = new SolidColorBrush(Color.FromRgb(0x2A, 0x2A, 0x2A)),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        _customPlus = new TextBlock
+        {
+            Text = "+",
+            FontSize = 12,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = new SolidColorBrush(Color.FromRgb(0xED, 0xED, 0xED)),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 0, 1)
+        };
+
+        _customSwatch = CreateSwatch();
+        _customSwatch.Background = RainbowSwatch;
+        var content = new Grid();
+        content.Children.Add(_customHole);
+        content.Children.Add(_customPlus);
+        _customSwatch.Child = content;
+
+        var customButton = new Button
+        {
+            Content = _customSwatch,
+            Style = (Style)FindResource("SwatchButton"),
+            ToolTip = "自定义颜色"
+        };
+        customButton.Click += (_, _) => OnCustomSwatchClick();
+        Swatches.Children.Add(customButton);
     }
 
-    private void SelectColor(string hex)
+    private static Border CreateSwatch() => new()
     {
-        _selectedColor = hex;
-        foreach (var (key, swatch) in _swatches)
+        Width = 26,
+        Height = 26,
+        CornerRadius = new CornerRadius(13),
+        BorderThickness = new Thickness(2),
+        BorderBrush = new SolidColorBrush(UnselectedSwatchBorder)
+    };
+
+    private static Brush CreateRainbowBrush()
+    {
+        var brush = new LinearGradientBrush
         {
-            bool selected = string.Equals(key, hex, StringComparison.OrdinalIgnoreCase);
-            swatch.BorderBrush = new SolidColorBrush(selected
-                ? Colors.White
-                : Color.FromArgb(0x30, 0xFF, 0xFF, 0xFF));
+            StartPoint = new Point(0, 0),
+            EndPoint = new Point(1, 1)
+        };
+        brush.GradientStops.Add(new GradientStop(Color.FromRgb(0xFF, 0x5B, 0x5B), 0));
+        brush.GradientStops.Add(new GradientStop(Color.FromRgb(0xFF, 0xD1, 0x66), 0.22));
+        brush.GradientStops.Add(new GradientStop(Color.FromRgb(0xA7, 0xE8, 0xA4), 0.42));
+        brush.GradientStops.Add(new GradientStop(Color.FromRgb(0x8E, 0xCA, 0xE6), 0.62));
+        brush.GradientStops.Add(new GradientStop(Color.FromRgb(0xC9, 0xB6, 0xF5), 0.82));
+        brush.GradientStops.Add(new GradientStop(Color.FromRgb(0xF4, 0xA6, 0xC0), 1));
+        brush.Freeze();
+        return brush;
+    }
+
+    private void InitializeSelection(LabelRule? existing, string defaultColor)
+    {
+        if (existing != null && Palette.TryParse(existing.Color, out var existingColor))
+        {
+            string hex = Palette.ToHex(existingColor);
+            if (Palette.Colors.Contains(hex, StringComparer.OrdinalIgnoreCase))
+            {
+                SelectBuiltIn(hex);
+            }
+            else
+            {
+                _customColor = hex;
+                SelectCustom();
+            }
+            return;
         }
 
-        var color = Palette.Parse(hex);
+        SelectBuiltIn(defaultColor);
+    }
+
+    private void SelectBuiltIn(string hex)
+    {
+        _customSelected = false;
+        _selectedColor = hex;
+        CustomPanel.Visibility = Visibility.Collapsed;
+        RefreshSelectionVisuals();
+        UpdateSavePreview(Palette.Parse(hex));
+    }
+
+    private void SelectCustom()
+    {
+        string color = _customColor ?? _selectedColor;
+        _customColor = color;
+        _customSelected = true;
+        _selectedColor = color;
+        RefreshSelectionVisuals();
+        UpdateCustomSwatchVisual();
+        UpdateSavePreview(Palette.Parse(color));
+    }
+
+    private void RefreshSelectionVisuals()
+    {
+        foreach (var (key, swatch) in _swatches)
+        {
+            bool selected = !_customSelected
+                            && string.Equals(key, _selectedColor, StringComparison.OrdinalIgnoreCase);
+            swatch.BorderBrush = new SolidColorBrush(selected ? Colors.White : UnselectedSwatchBorder);
+        }
+
+        _customSwatch.BorderBrush = new SolidColorBrush(
+            _customSelected ? Colors.White : UnselectedSwatchBorder);
+    }
+
+    private void UpdateSavePreview(Color color)
+    {
         SaveButton.Background = new SolidColorBrush(color);
         SaveButton.Foreground = Palette.TextBrushFor(color);
+    }
+
+    private void UpdateCustomSwatchVisual()
+    {
+        string? custom = _customColor;
+        if (custom != null)
+        {
+            var color = Palette.Parse(custom);
+            _customSwatch.Background = new SolidColorBrush(color);
+            _customHole.Visibility = Visibility.Collapsed;
+            _customPlus.Foreground = Palette.TextBrushFor(color);
+            _customPlus.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            _customSwatch.Background = RainbowSwatch;
+            _customHole.Visibility = Visibility.Visible;
+            _customPlus.Foreground = Brushes.White;
+            _customPlus.Visibility = Visibility.Visible;
+        }
+    }
+
+    private void OnCustomSwatchClick()
+    {
+        if (CustomPanel.Visibility == Visibility.Visible && _customSelected)
+        {
+            CustomPanel.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        string color = _customColor ?? _selectedColor;
+        _customColor = color;
+        SelectCustom();
+        SetHsvFromColor(Palette.Parse(color));
+
+        CustomPanel.Visibility = Visibility.Visible;
+        UpdateLayout();
+        RefreshPicker();
+        Dispatcher.BeginInvoke(new Action(EnsureOnScreen), DispatcherPriority.Loaded);
+    }
+
+    private void RefreshPicker()
+    {
+        var color = Palette.Parse(_customColor ?? _selectedColor);
+        SvBase.Fill = new SolidColorBrush(HsvToColor(_hue, 1, 1));
+        PositionPickerThumbs();
+        HexPreview.Background = new SolidColorBrush(color);
+        SetHexText(Palette.ToHex(color));
+    }
+
+    private void PositionPickerThumbs()
+    {
+        double width = SvArea.ActualWidth;
+        double height = SvArea.ActualHeight;
+        if (width <= 0 || height <= 0) return;
+
+        double x = _saturation * width;
+        double y = (1 - _value) * height;
+        Canvas.SetLeft(SvThumbRing, x - SvThumbRing.Width / 2);
+        Canvas.SetTop(SvThumbRing, y - SvThumbRing.Height / 2);
+        Canvas.SetLeft(SvThumb, x - SvThumb.Width / 2);
+        Canvas.SetTop(SvThumb, y - SvThumb.Height / 2);
+
+        double hueWidth = HueBar.ActualWidth;
+        if (hueWidth <= 0) return;
+        Canvas.SetLeft(HueThumb, _hue / 360.0 * hueWidth - HueThumb.Width / 2);
+        Canvas.SetTop(HueThumb, (HueBar.ActualHeight - HueThumb.Height) / 2);
+    }
+
+    private void OnSvMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        SvArea.CaptureMouse();
+        UpdateSaturationValue(e.GetPosition(SvArea));
+        e.Handled = true;
+    }
+
+    private void OnSvMouseMove(object sender, MouseEventArgs e)
+    {
+        if (e.LeftButton == MouseButtonState.Pressed && SvArea.IsMouseCaptured)
+        {
+            UpdateSaturationValue(e.GetPosition(SvArea));
+        }
+    }
+
+    private void OnSvMouseUp(object sender, MouseButtonEventArgs e)
+    {
+        if (SvArea.IsMouseCaptured) SvArea.ReleaseMouseCapture();
+    }
+
+    private void UpdateSaturationValue(Point point)
+    {
+        double width = SvArea.ActualWidth;
+        double height = SvArea.ActualHeight;
+        if (width <= 0 || height <= 0) return;
+
+        _saturation = Math.Clamp(point.X / width, 0, 1);
+        _value = 1 - Math.Clamp(point.Y / height, 0, 1);
+        ApplyPickerColor();
+    }
+
+    private void OnHueMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        HueBar.CaptureMouse();
+        UpdateHue(e.GetPosition(HueBar));
+        e.Handled = true;
+    }
+
+    private void OnHueMouseMove(object sender, MouseEventArgs e)
+    {
+        if (e.LeftButton == MouseButtonState.Pressed && HueBar.IsMouseCaptured)
+        {
+            UpdateHue(e.GetPosition(HueBar));
+        }
+    }
+
+    private void OnHueMouseUp(object sender, MouseButtonEventArgs e)
+    {
+        if (HueBar.IsMouseCaptured) HueBar.ReleaseMouseCapture();
+    }
+
+    private void UpdateHue(Point point)
+    {
+        double width = HueBar.ActualWidth;
+        if (width <= 0) return;
+
+        _hue = Math.Clamp(point.X / width, 0, 1) * 360;
+        ApplyPickerColor();
+    }
+
+    private void ApplyPickerColor()
+    {
+        var color = HsvToColor(_hue, _saturation, _value);
+        string hex = Palette.ToHex(color);
+        _customColor = hex;
+        _selectedColor = hex;
+        _customSelected = true;
+
+        SvBase.Fill = new SolidColorBrush(HsvToColor(_hue, 1, 1));
+        PositionPickerThumbs();
+        UpdateCustomSwatchVisual();
+        RefreshSelectionVisuals();
+        UpdateSavePreview(color);
+        HexPreview.Background = new SolidColorBrush(color);
+        SetHexText(hex);
+    }
+
+    private void OnHexTextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_suppressHexChange) return;
+
+        string text = HexBox.Text.Trim();
+        if (text.Length == 0) return;
+        if (text[0] != '#') text = "#" + text;
+        if (text.Length != 7 || !Palette.TryParse(text, out var parsed)) return;
+
+        var color = Color.FromRgb(parsed.R, parsed.G, parsed.B);
+        string hex = Palette.ToHex(color);
+        _customColor = hex;
+        _selectedColor = hex;
+        _customSelected = true;
+        SetHsvFromColor(color);
+
+        SvBase.Fill = new SolidColorBrush(HsvToColor(_hue, 1, 1));
+        PositionPickerThumbs();
+        UpdateCustomSwatchVisual();
+        RefreshSelectionVisuals();
+        UpdateSavePreview(color);
+        HexPreview.Background = new SolidColorBrush(color);
+    }
+
+    private void OnHexLostFocus(object sender, RoutedEventArgs e)
+    {
+        SetHexText(Palette.ToHex(Palette.Parse(_customColor ?? _selectedColor)));
+    }
+
+    private void SetHexText(string hex)
+    {
+        if (string.Equals(HexBox.Text, hex, StringComparison.OrdinalIgnoreCase)) return;
+
+        _suppressHexChange = true;
+        HexBox.Text = hex;
+        _suppressHexChange = false;
+    }
+
+    private void OnPickerSizeChanged(object sender, SizeChangedEventArgs e) => PositionPickerThumbs();
+
+    private void SetHsvFromColor(Color color)
+    {
+        double r = color.R / 255.0;
+        double g = color.G / 255.0;
+        double b = color.B / 255.0;
+        double max = Math.Max(r, Math.Max(g, b));
+        double min = Math.Min(r, Math.Min(g, b));
+        double delta = max - min;
+
+        _value = max;
+        _saturation = max <= 0 ? 0 : delta / max;
+
+        if (delta <= 0) return;
+        if (max == r) _hue = 60 * (((g - b) / delta) % 6);
+        else if (max == g) _hue = 60 * ((b - r) / delta + 2);
+        else _hue = 60 * ((r - g) / delta + 4);
+        if (_hue < 0) _hue += 360;
+    }
+
+    private static Color HsvToColor(double hue, double saturation, double value)
+    {
+        hue = ((hue % 360) + 360) % 360;
+        saturation = Math.Clamp(saturation, 0, 1);
+        value = Math.Clamp(value, 0, 1);
+
+        double c = value * saturation;
+        double x = c * (1 - Math.Abs(hue / 60 % 2 - 1));
+        double m = value - c;
+
+        (double r, double g, double b) = hue switch
+        {
+            < 60 => (c, x, 0.0),
+            < 120 => (x, c, 0.0),
+            < 180 => (0.0, c, x),
+            < 240 => (0.0, x, c),
+            < 300 => (x, 0.0, c),
+            _ => (c, 0.0, x)
+        };
+
+        return Color.FromRgb(Channel(r + m), Channel(g + m), Channel(b + m));
+
+        static byte Channel(double channel) => (byte)Math.Round(Math.Clamp(channel, 0, 1) * 255);
+    }
+
+    private void EnsureOnScreen()
+    {
+        var handle = new WindowInteropHelper(this).Handle;
+        if (handle == IntPtr.Zero) return;
+        if (!NativeMethods.GetWindowRect(handle, out var rect)) return;
+
+        int width = rect.Right - rect.Left;
+        int height = rect.Bottom - rect.Top;
+        if (width <= 0 || height <= 0) return;
+
+        var workArea = Forms.Screen.FromRectangle(
+            new Drawing.Rectangle(rect.Left, rect.Top, width, height)).WorkingArea;
+
+        int x = Math.Clamp(rect.Left, workArea.Left + 8,
+            Math.Max(workArea.Left + 8, workArea.Right - width - 8));
+        int y = Math.Clamp(rect.Top, workArea.Top + 8,
+            Math.Max(workArea.Top + 8, workArea.Bottom - height - 8));
+
+        if (x == rect.Left && y == rect.Top) return;
+        NativeMethods.SetWindowPos(handle, IntPtr.Zero, x, y, 0, 0,
+            NativeMethods.SWP_NOSIZE | NativeMethods.SWP_NOZORDER | NativeMethods.SWP_NOACTIVATE);
     }
 
     private void Commit()

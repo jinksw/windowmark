@@ -13,7 +13,7 @@ When several chat windows, editors, or terminals are open at once, they often lo
 - **Overlay labels**: a colored chip is drawn at the top-right of the title bar without modifying the window itself.
 - **Hotkey**: press `Ctrl + Alt + L` to label the window under the mouse pointer.
 - **Tray menu**: alternatively, right-click the tray icon and pick a window from "Select a window to label".
-- **Custom look**: up to 24 characters, 8 built-in colors, full Unicode support.
+- **Custom look**: up to 24 characters, 8 built-in colors plus a custom color picker, full Unicode support.
 - **Click-through**: labels never intercept mouse input, take focus, or appear in the taskbar or Alt+Tab.
 - **Tracks the window**: the label follows moves and resizes, hides when the window is minimized or moved to another virtual desktop, and is cleaned up when the window closes.
 - **Persistent rules**: rules are stored by executable path + window class + native title, and labels are restored after restarting WindowMark or reopening a matching window.
@@ -51,7 +51,7 @@ dotnet publish WindowMark.csproj -c Release -r win-x64 --self-contained false -p
 
 1. Start WindowMark. A `W` icon appears in the notification area; no main window is shown.
 2. Hover the target window and press `Ctrl + Alt + L`.
-3. Enter a label, pick a color, and click "Save".
+3. Enter a label, pick a color (the last swatch opens a custom color picker), and click "Save".
 4. Press the hotkey again on the same window to edit or delete its label.
 5. If the hotkey is already taken by another app, right-click the tray icon and use "Select a window to label".
 6. To quit, right-click the tray icon and choose "Exit".

@@ -51,9 +51,9 @@
         </Style>
 
         <Style x:Key="SwatchButton" TargetType="Button">
-            <Setter Property="Width" Value="32" />
-            <Setter Property="Height" Value="32" />
-            <Setter Property="Margin" Value="0,0,4,4" />
+            <Setter Property="Width" Value="30" />
+            <Setter Property="Height" Value="30" />
+            <Setter Property="Margin" Value="0,0,2,4" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Setter Property="Template">
@@ -128,6 +128,95 @@
 
             <TextBlock Text="颜色" Foreground="#8F8F8F" FontSize="11" Margin="1,12,0,6" />
             <WrapPanel x:Name="Swatches" />
+
+            <StackPanel x:Name="CustomPanel" Visibility="Collapsed" Margin="0,8,0,0">
+                <Border Background="#2A2A2A" CornerRadius="8" Padding="10">
+                    <StackPanel>
+                        <Grid x:Name="SvArea"
+                              Height="110"
+                              Background="Transparent"
+                              Cursor="Cross"
+                              ClipToBounds="True"
+                              MouseLeftButtonDown="OnSvMouseDown"
+                              MouseMove="OnSvMouseMove"
+                              MouseLeftButtonUp="OnSvMouseUp"
+                              SizeChanged="OnPickerSizeChanged">
+                            <Rectangle x:Name="SvBase" />
+                            <Rectangle>
+                                <Rectangle.Fill>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                        <GradientStop Color="#FFFFFFFF" Offset="0" />
+                                        <GradientStop Color="#00FFFFFF" Offset="1" />
+                                    </LinearGradientBrush>
+                                </Rectangle.Fill>
+                            </Rectangle>
+                            <Rectangle>
+                                <Rectangle.Fill>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                        <GradientStop Color="#00000000" Offset="0" />
+                                        <GradientStop Color="#FF000000" Offset="1" />
+                                    </LinearGradientBrush>
+                                </Rectangle.Fill>
+                            </Rectangle>
+                            <Canvas IsHitTestVisible="False">
+                                <Ellipse x:Name="SvThumbRing" Width="14" Height="14" Stroke="#99000000" StrokeThickness="1" />
+                                <Ellipse x:Name="SvThumb" Width="12" Height="12" Stroke="#FFFFFF" StrokeThickness="2" />
+                            </Canvas>
+                        </Grid>
+
+                        <Grid x:Name="HueBar"
+                              Height="12"
+                              Margin="0,10,0,0"
+                              Background="Transparent"
+                              Cursor="Hand"
+                              MouseLeftButtonDown="OnHueMouseDown"
+                              MouseMove="OnHueMouseMove"
+                              MouseLeftButtonUp="OnHueMouseUp"
+                              SizeChanged="OnPickerSizeChanged">
+                            <Border CornerRadius="6">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                        <GradientStop Color="#FF0000" Offset="0" />
+                                        <GradientStop Color="#FFFF00" Offset="0.1667" />
+                                        <GradientStop Color="#00FF00" Offset="0.3333" />
+                                        <GradientStop Color="#00FFFF" Offset="0.5" />
+                                        <GradientStop Color="#0000FF" Offset="0.6667" />
+                                        <GradientStop Color="#FF00FF" Offset="0.8333" />
+                                        <GradientStop Color="#FF0000" Offset="1" />
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                            </Border>
+                            <Canvas IsHitTestVisible="False">
+                                <Border x:Name="HueThumb"
+                                        Width="4"
+                                        Height="16"
+                                        CornerRadius="2"
+                                        Background="#FFFFFF"
+                                        BorderBrush="#99000000"
+                                        BorderThickness="1" />
+                            </Canvas>
+                        </Grid>
+
+                        <DockPanel Margin="0,10,0,0">
+                            <Border x:Name="HexPreview"
+                                    DockPanel.Dock="Right"
+                                    Width="28"
+                                    Height="28"
+                                    CornerRadius="7"
+                                    Margin="8,0,0,0"
+                                    BorderBrush="#33FFFFFF"
+                                    BorderThickness="1" />
+                            <TextBox x:Name="HexBox"
+                                     Style="{StaticResource DarkTextBox}"
+                                     MaxLength="7"
+                                     Padding="8,4"
+                                     FontFamily="Consolas, Microsoft YaHei UI"
+                                     TextChanged="OnHexTextChanged"
+                                     LostFocus="OnHexLostFocus" />
+                        </DockPanel>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
 
             <DockPanel Margin="0,14,0,0">
                 <Button x:Name="SaveButton"

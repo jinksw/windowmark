@@ -31,17 +31,29 @@ internal static class Palette
         }
     }
 
-    public static Color Parse(string hex)
+    public static bool TryParse(string? hex, out Color color)
     {
+        color = default;
+        if (string.IsNullOrWhiteSpace(hex)) return false;
+
         try
         {
-            if (ColorConverter.ConvertFromString(hex) is Color color) return color;
+            if (ColorConverter.ConvertFromString(hex.Trim()) is Color parsed)
+            {
+                color = parsed;
+                return true;
+            }
         }
         catch
         {
         }
-        return (Color)ColorConverter.ConvertFromString(Colors[0])!;
+        return false;
     }
+
+    public static Color Parse(string hex)
+        => TryParse(hex, out var color) ? color : (Color)ColorConverter.ConvertFromString(Colors[0])!;
+
+    public static string ToHex(Color color) => $"#{color.R:X2}{color.G:X2}{color.B:X2}";
 
     public static Brush TextBrushFor(Color background)
     {
