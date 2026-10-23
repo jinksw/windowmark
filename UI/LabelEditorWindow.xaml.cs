@@ -54,6 +54,11 @@ public partial class LabelEditorWindow : Window
     private bool _suppressHexChange;
     private bool _positioned;
     private readonly Action<LabelPreview>? _preview;
+    private readonly DispatcherTimer _previewTimer;
+    private bool _imeComposing;
+    private bool _previewQueued;
+    private LabelPreview? _pendingPreview;
+    private bool _closing;
     private LabelAnchor _anchor = LabelAnchor.TopRight;
     private double _offsetX = -LabelLayout.DefaultRightInset;
     private double _offsetY = LabelLayout.DefaultTopInset;
@@ -75,12 +80,23 @@ public partial class LabelEditorWindow : Window
     {
         InitializeComponent();
         _preview = preview;
+        _previewTimer = new DispatcherTimer(DispatcherPriority.Background)
+        {
+            Interval = TimeSpan.FromMilliseconds(200)
+        };
+        _previewTimer.Tick += OnPreviewTimerTick;
 
         LoadLayoutState(existing);
 
         TargetText.Text = $"{GetAppName(target)}  ·  {target.NativeTitle}";
         LabelBox.Text = existing?.Label ?? "";
-        LabelBox.TextChanged += (_, _) => RaisePreview();
+        LabelBox.AddHandler(TextCompositionManager.TextInputStartEvent,
+            new TextCompositionEventHandler(OnImeCompositionStart), true);
+        LabelBox.AddHandler(TextCompositionManager.TextInputUpdateEvent,
+            new TextCompositionEventHandler(OnImeCompositionUpdate), true);
+        LabelBox.AddHandler(TextCompositionManager.TextInputEvent,
+            new TextCompositionEventHandler(OnImeCompositionCompleted), true);
+        LabelBox.LostKeyboardFocus += OnLabelBoxLostKeyboardFocus;
 
         BuildSwatches();
         InitializeSelection(existing, defaultColor);
@@ -94,6 +110,8 @@ public partial class LabelEditorWindow : Window
         DeleteButton.Click += (_, _) =>
         {
             Action = LabelEditorAction.Delete;
+            _closing = true;
+            _previewTimer.Stop();
             DialogResult = true;
         };
 
@@ -106,6 +124,7 @@ public partial class LabelEditorWindow : Window
         };
 
         PreviewKeyDown += OnPreviewKeyDown;
+        PreviewMouseDown += OnWindowPreviewMouseDown;
         ContentRendered += OnContentRendered;
         Loaded += (_, _) => FocusLabelBox();
     }
@@ -340,18 +359,82 @@ public partial class LabelEditorWindow : Window
         }
 
         LayoutSummary.Text = $"{Math.Round(_scale * 100)}%";
-        RaisePreview();
+        QueuePreview();
     }
 
-    private void RaisePreview()
+    private void QueuePreview()
     {
-        _preview?.Invoke(new LabelPreview(
-            ResultLabel,
-            ResultColor,
-            ResultAnchor,
-            ResultOffsetX,
-            ResultOffsetY,
-            ResultScale));
+        if (_preview == null || _closing) return;
+
+        _pendingPreview = CreatePreview();
+        if (_previewQueued) return;
+
+        _previewQueued = true;
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            _previewQueued = false;
+            var preview = _pendingPreview;
+            _pendingPreview = null;
+
+            if (preview == null || _closing || _imeComposing) return;
+            ApplyPreview(preview);
+        }), DispatcherPriority.Background);
+    }
+
+    private LabelPreview CreatePreview() => new(
+        ResultLabel,
+        ResultColor,
+        ResultAnchor,
+        ResultOffsetX,
+        ResultOffsetY,
+        ResultScale);
+
+    private void ApplyPreview(LabelPreview preview)
+    {
+        if (_closing || _imeComposing) return;
+
+        try
+        {
+            _preview?.Invoke(preview);
+        }
+        catch (Exception ex)
+        {
+            Log.Error("更新标签预览失败", ex);
+        }
+    }
+
+    private void OnImeCompositionStart(object sender, TextCompositionEventArgs e)
+    {
+        _imeComposing = true;
+        _previewTimer.Stop();
+    }
+
+    private void OnImeCompositionUpdate(object sender, TextCompositionEventArgs e)
+    {
+        _imeComposing = true;
+        _previewTimer.Stop();
+    }
+
+    private void OnImeCompositionCompleted(object sender, TextCompositionEventArgs e)
+    {
+        // TextInput 只在组合输入提交后触发，此时再延迟预览是安全的。
+        _imeComposing = false;
+        _previewTimer.Stop();
+        _previewTimer.Start();
+    }
+
+    private void OnLabelBoxLostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+    {
+        _imeComposing = false;
+        _previewTimer.Stop();
+        _previewTimer.Start();
+    }
+
+    private void OnPreviewTimerTick(object? sender, EventArgs e)
+    {
+        _previewTimer.Stop();
+        if (_imeComposing) return;
+        QueuePreview();
     }
 
     private void SelectBuiltIn(string hex)
@@ -391,7 +474,7 @@ public partial class LabelEditorWindow : Window
     {
         SaveButton.Background = new SolidColorBrush(color);
         SaveButton.Foreground = Palette.TextBrushFor(color);
-        RaisePreview();
+        QueuePreview();
     }
 
     private void UpdateCustomSwatchVisual()
@@ -673,17 +756,42 @@ public partial class LabelEditorWindow : Window
         {
             Action = LabelEditorAction.Save;
         }
+
+        _closing = true;
+        _previewTimer.Stop();
         DialogResult = true;
     }
 
     private void Cancel()
     {
         Action = LabelEditorAction.Cancel;
+        _closing = true;
+        _previewTimer.Stop();
         Close();
+    }
+
+    private void OnWindowPreviewMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        // WPF/TSF 在组合输入期间点击文本框会走 TextEditor.CompleteComposition，
+        // 某些输入法下会直接 FailFast。组合期间先拦截文本框内的鼠标按下。
+        if (!_imeComposing || !LabelBox.IsMouseOver) return;
+        e.Handled = true;
     }
 
     private void OnPreviewKeyDown(object sender, KeyEventArgs e)
     {
+        // 输入法组合中，Enter/Escape 属于候选词操作，不能当成保存/关闭。
+        if (_imeComposing && (e.Key == Key.Enter || e.Key == Key.Escape))
+        {
+            if (e.Key == Key.Escape)
+            {
+                _imeComposing = false;
+                _previewTimer.Stop();
+                _previewTimer.Start();
+            }
+            return;
+        }
+
         if (e.Key == Key.Escape)
         {
             e.Handled = true;
@@ -694,6 +802,13 @@ public partial class LabelEditorWindow : Window
             e.Handled = true;
             Commit();
         }
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        _closing = true;
+        _previewTimer.Stop();
+        base.OnClosed(e);
     }
 
     private void OnContentRendered(object? sender, EventArgs e)

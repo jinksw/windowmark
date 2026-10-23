@@ -21,7 +21,7 @@ When several chat windows, editors, or terminals are open at once, they often lo
 - **DPI aware**: Per-Monitor V2, verified at 150% scaling.
 - **Local-first**: rules live in a local JSON file. No network requests, no telemetry.
 
-> WindowMark is at an early `0.2.0` stage. The user interface is currently in Simplified Chinese.
+> WindowMark is at an early `0.2.1` stage. The user interface is currently in Simplified Chinese.
 
 ## Download
 

@@ -17,7 +17,7 @@
     <Authors>WindowMark contributors</Authors>
     <Copyright>Copyright © 2026 WindowMark contributors</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <Version>0.2.0</Version>
+    <Version>0.2.1</Version>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
     <NoWarn>$(NoWarn);WFAC010</NoWarn>
   </PropertyGroup>
