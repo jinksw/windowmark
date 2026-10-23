@@ -5,6 +5,8 @@ namespace WindowMark.UI;
 
 internal static class Palette
 {
+    public static readonly Color LayoutAccent = Color.FromRgb(0x4C, 0x9A, 0xFF);
+
     public static readonly string[] Colors =
     {
         "#FFD166",

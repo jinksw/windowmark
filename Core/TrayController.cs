@@ -18,17 +18,21 @@ internal sealed class TrayController : IDisposable
     private readonly IntPtr _nativeIcon;
     private readonly Func<IReadOnlyList<TargetWindow>> _listWindows;
     private readonly Action<IntPtr> _tagWindow;
+    private readonly Action _toggleLayoutMode;
     private readonly Action _exit;
     private readonly ToolStripMenuItem _windowListMenu;
+    private readonly ToolStripMenuItem _layoutItem;
     private bool _disposed;
 
     internal TrayController(
         Func<IReadOnlyList<TargetWindow>> listWindows,
         Action<IntPtr> tagWindow,
+        Action toggleLayoutMode,
         Action exit)
     {
         _listWindows = listWindows;
         _tagWindow = tagWindow;
+        _toggleLayoutMode = toggleLayoutMode;
         _exit = exit;
 
         (_iconHandle, _nativeIcon) = CreateTrayIcon();
@@ -40,6 +44,8 @@ internal sealed class TrayController : IDisposable
         };
 
         var hint = new ToolStripMenuItem("Ctrl+Alt+L   标记鼠标下的窗口") { Enabled = false };
+        _layoutItem = new ToolStripMenuItem("调整标签位置与大小");
+        _layoutItem.Click += (_, _) => _toggleLayoutMode();
         _windowListMenu = new ToolStripMenuItem("选择窗口打标签");
         _windowListMenu.DropDownOpening += (_, _) => FillWindowList();
 
@@ -50,6 +56,7 @@ internal sealed class TrayController : IDisposable
         exitItem.Click += (_, _) => _exit();
 
         _menu.Items.Add(hint);
+        _menu.Items.Add(_layoutItem);
         _menu.Items.Add(_windowListMenu);
         _menu.Items.Add(new ToolStripSeparator());
         _menu.Items.Add(dataFolderItem);
@@ -71,6 +78,12 @@ internal sealed class TrayController : IDisposable
         ShowInfo(hotkeyRegistered
             ? "已启动。按 Ctrl+Alt+L 标记鼠标下的窗口。"
             : "热键 Ctrl+Alt+L 被占用，请右键托盘图标选择窗口。");
+    }
+
+    internal void SetLayoutModeActive(bool active)
+    {
+        if (_disposed) return;
+        _layoutItem.Text = active ? "退出调整模式" : "调整标签位置与大小";
     }
 
     internal void ShowInfo(string text)

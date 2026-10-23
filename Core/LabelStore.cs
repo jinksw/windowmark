@@ -50,6 +50,7 @@ internal sealed class LabelStore
                 .Select(group => group.Last())
                 .ToList() ?? new List<LabelRule>();
 
+            foreach (var rule in rules) rule.SanitizeLayout();
             return new LabelStore(rules);
         }
         catch (Exception ex)

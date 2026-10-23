@@ -22,12 +22,26 @@ internal enum LabelEditorAction
     Delete
 }
 
+internal sealed record LabelPreview(
+    string Label,
+    string Color,
+    string Anchor,
+    double OffsetX,
+    double OffsetY,
+    double Scale);
+
 public partial class LabelEditorWindow : Window
 {
     private static readonly Color UnselectedSwatchBorder = Color.FromArgb(0x30, 0xFF, 0xFF, 0xFF);
     private static readonly Brush RainbowSwatch = CreateRainbowBrush();
+    private static readonly Brush LayoutPresetBrush = CreateFrozenBrush(Color.FromRgb(0x2A, 0x2A, 0x2A));
+    private static readonly Brush LayoutSelectedBrush = CreateFrozenBrush(Palette.LayoutAccent);
+    private static readonly Brush LayoutDotBrush = CreateFrozenBrush(Color.FromRgb(0x7A, 0x7A, 0x7A));
 
     private readonly Dictionary<string, Border> _swatches = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<LabelAnchor, Button> _layoutPositionButtons = new();
+    private readonly Dictionary<LabelAnchor, Border> _layoutPositionDots = new();
+    private readonly Dictionary<double, Button> _layoutSizeButtons = new();
     private Border _customSwatch = null!;
     private Border _customHole = null!;
     private TextBlock _customPlus = null!;
@@ -39,20 +53,39 @@ public partial class LabelEditorWindow : Window
     private double _value = 1;
     private bool _suppressHexChange;
     private bool _positioned;
+    private readonly Action<LabelPreview>? _preview;
+    private LabelAnchor _anchor = LabelAnchor.TopRight;
+    private double _offsetX = -LabelLayout.DefaultRightInset;
+    private double _offsetY = LabelLayout.DefaultTopInset;
+    private double _scale = 1.0;
 
     internal LabelEditorAction Action { get; private set; } = LabelEditorAction.Cancel;
     internal string ResultLabel => LabelBox.Text.Trim();
     internal string ResultColor => _selectedColor;
+    internal string ResultAnchor => _anchor.ToString();
+    internal double ResultOffsetX => _offsetX;
+    internal double ResultOffsetY => _offsetY;
+    internal double ResultScale => _scale;
 
-    internal LabelEditorWindow(TargetWindow target, LabelRule? existing, string defaultColor)
+    internal LabelEditorWindow(
+        TargetWindow target,
+        LabelRule? existing,
+        string defaultColor,
+        Action<LabelPreview>? preview = null)
     {
         InitializeComponent();
+        _preview = preview;
+
+        LoadLayoutState(existing);
 
         TargetText.Text = $"{GetAppName(target)}  ·  {target.NativeTitle}";
         LabelBox.Text = existing?.Label ?? "";
+        LabelBox.TextChanged += (_, _) => RaisePreview();
 
         BuildSwatches();
         InitializeSelection(existing, defaultColor);
+        BuildLayoutControls();
+        RefreshLayoutSelection();
         DeleteButton.Visibility = existing != null ? Visibility.Visible : Visibility.Collapsed;
 
         CloseButton.Click += (_, _) => Cancel();
@@ -159,6 +192,13 @@ public partial class LabelEditorWindow : Window
         BorderBrush = new SolidColorBrush(UnselectedSwatchBorder)
     };
 
+    private static Brush CreateFrozenBrush(Color color)
+    {
+        var brush = new SolidColorBrush(color);
+        brush.Freeze();
+        return brush;
+    }
+
     private static Brush CreateRainbowBrush()
     {
         var brush = new LinearGradientBrush
@@ -194,6 +234,124 @@ public partial class LabelEditorWindow : Window
         }
 
         SelectBuiltIn(defaultColor);
+    }
+
+    private void BuildLayoutControls()
+    {
+        var presetStyle = (Style)FindResource("PresetButton");
+
+        foreach (var anchor in Enum.GetValues<LabelAnchor>())
+        {
+            var dot = new Border
+            {
+                Width = 7,
+                Height = 7,
+                CornerRadius = new CornerRadius(3.5),
+                Background = LayoutDotBrush
+            };
+
+            var button = new Button
+            {
+                Content = dot,
+                Style = presetStyle,
+                ToolTip = LabelLayout.AnchorName(anchor)
+            };
+            button.Click += (_, _) => SelectAnchor(anchor);
+
+            PositionGrid.Children.Add(button);
+            _layoutPositionButtons[anchor] = button;
+            _layoutPositionDots[anchor] = dot;
+        }
+
+        foreach (var (label, scale) in LabelLayout.SizePresets)
+        {
+            var button = new Button
+            {
+                Content = label,
+                Style = presetStyle,
+                Height = 28,
+                ToolTip = $"{scale * 100:0}%"
+            };
+            button.Click += (_, _) => SelectScale(scale);
+
+            SizeGrid.Children.Add(button);
+            _layoutSizeButtons[scale] = button;
+        }
+
+        ResetLayoutButton.Click += (_, _) => ResetLayoutSelection();
+    }
+
+    private void LoadLayoutState(LabelRule? existing)
+    {
+        var layout = new LabelRule();
+        if (existing != null)
+        {
+            layout.Anchor = existing.Anchor;
+            layout.OffsetX = existing.OffsetX;
+            layout.OffsetY = existing.OffsetY;
+            layout.Scale = existing.Scale;
+        }
+        layout.SanitizeLayout();
+
+        _anchor = layout.AnchorValue;
+        _offsetX = layout.OffsetX;
+        _offsetY = layout.OffsetY;
+        _scale = layout.Scale;
+    }
+
+    private void SelectAnchor(LabelAnchor anchor)
+    {
+        var preset = LabelLayout.PositionPreset(anchor);
+        _anchor = anchor;
+        _offsetX = preset.OffsetX;
+        _offsetY = preset.OffsetY;
+        RefreshLayoutSelection();
+    }
+
+    private void SelectScale(double scale)
+    {
+        _scale = Math.Clamp(scale, LabelLayout.MinScale, LabelLayout.MaxScale);
+        RefreshLayoutSelection();
+    }
+
+    private void ResetLayoutSelection()
+    {
+        _anchor = LabelAnchor.TopRight;
+        _offsetX = -LabelLayout.DefaultRightInset;
+        _offsetY = LabelLayout.DefaultTopInset;
+        _scale = 1.0;
+        RefreshLayoutSelection();
+    }
+
+    private void RefreshLayoutSelection()
+    {
+        foreach (var (key, button) in _layoutPositionButtons)
+        {
+            bool selected = key == _anchor;
+            button.Background = selected ? LayoutSelectedBrush : LayoutPresetBrush;
+            _layoutPositionDots[key].Background = selected ? Brushes.White : LayoutDotBrush;
+        }
+
+        foreach (var (value, button) in _layoutSizeButtons)
+        {
+            bool selected = Math.Abs(value - _scale) < 0.01;
+            button.Background = selected ? LayoutSelectedBrush : LayoutPresetBrush;
+            button.FontWeight = selected ? FontWeights.SemiBold : FontWeights.Normal;
+        }
+
+        LayoutSummary.Text = $"{Math.Round(_scale * 100)}%";
+        RaisePreview();
+    }
+
+    private void RaisePreview()
+    {
+        _preview?.Invoke(new LabelPreview(
+            ResultLabel,
+            ResultColor,
+            ResultAnchor,
+            ResultOffsetX,
+            ResultOffsetY,
+            ResultScale));
     }
 
     private void SelectBuiltIn(string hex)
@@ -233,6 +391,7 @@ public partial class LabelEditorWindow : Window
     {
         SaveButton.Background = new SolidColorBrush(color);
         SaveButton.Foreground = Palette.TextBrushFor(color);
+        RaisePreview();
     }
 
     private void UpdateCustomSwatchVisual()
@@ -271,7 +430,11 @@ public partial class LabelEditorWindow : Window
         CustomPanel.Visibility = Visibility.Visible;
         UpdateLayout();
         RefreshPicker();
-        Dispatcher.BeginInvoke(new Action(EnsureOnScreen), DispatcherPriority.Loaded);
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            SvArea.BringIntoView();
+            EnsureOnScreen();
+        }), DispatcherPriority.Loaded);
     }
 
     private void RefreshPicker()
@@ -473,9 +636,23 @@ public partial class LabelEditorWindow : Window
         int height = rect.Bottom - rect.Top;
         if (width <= 0 || height <= 0) return;
 
-        var workArea = Forms.Screen.FromRectangle(
-            new Drawing.Rectangle(rect.Left, rect.Top, width, height)).WorkingArea;
+        var screen = Forms.Screen.FromRectangle(
+            new Drawing.Rectangle(rect.Left, rect.Top, width, height));
 
+        double dpiScale = VisualTreeHelper.GetDpi(this).DpiScaleY;
+        double maxHeight = Math.Max(240, screen.WorkingArea.Height / dpiScale - 16);
+        if (Math.Abs(MaxHeight - maxHeight) > 0.5)
+        {
+            MaxHeight = maxHeight;
+            UpdateLayout();
+
+            if (!NativeMethods.GetWindowRect(handle, out rect)) return;
+            width = rect.Right - rect.Left;
+            height = rect.Bottom - rect.Top;
+            if (width <= 0 || height <= 0) return;
+        }
+
+        var workArea = screen.WorkingArea;
         int x = Math.Clamp(rect.Left, workArea.Left + 8,
             Math.Max(workArea.Left + 8, workArea.Right - width - 8));
         int y = Math.Clamp(rect.Top, workArea.Top + 8,
@@ -527,6 +704,7 @@ public partial class LabelEditorWindow : Window
         var handle = new WindowInteropHelper(this).Handle;
         if (!NativeMethods.GetCursorPos(out var cursor))
         {
+            EnsureOnScreen();
             LabelBox.Focus();
             return;
         }
@@ -544,6 +722,7 @@ public partial class LabelEditorWindow : Window
         NativeMethods.SetWindowPos(handle, IntPtr.Zero, x, y, 0, 0,
             NativeMethods.SWP_NOSIZE | NativeMethods.SWP_NOZORDER | NativeMethods.SWP_NOACTIVATE);
 
+        EnsureOnScreen();
         FocusLabelBox();
     }
 

@@ -65,6 +65,32 @@
             </Setter>
         </Style>
 
+        <Style x:Key="PresetButton" TargetType="Button">
+            <Setter Property="Background" Value="#2A2A2A" />
+            <Setter Property="Foreground" Value="#EDEDED" />
+            <Setter Property="Margin" Value="2" />
+            <Setter Property="Height" Value="30" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="6">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.8" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style x:Key="DarkTextBox" TargetType="TextBox">
             <Setter Property="Background" Value="#2A2A2A" />
             <Setter Property="Foreground" Value="#F5F5F5" />
@@ -101,8 +127,14 @@
             BorderBrush="#33FFFFFF"
             BorderThickness="1"
             Padding="16">
-        <StackPanel>
-            <DockPanel x:Name="HeaderRow" Background="Transparent">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <DockPanel x:Name="HeaderRow" Grid.Row="0" Background="Transparent">
                 <Button x:Name="CloseButton"
                         DockPanel.Dock="Right"
                         Content="✕"
@@ -118,107 +150,141 @@
                            VerticalAlignment="Center" />
             </DockPanel>
 
-            <TextBlock x:Name="TargetText"
-                       Foreground="#9C9C9C"
-                       FontSize="11"
-                       Margin="0,6,0,12"
-                       TextTrimming="CharacterEllipsis" />
+            <ScrollViewer x:Name="ContentScroller"
+                          Grid.Row="1"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled"
+                          Focusable="False">
+                <StackPanel>
+                    <TextBlock x:Name="TargetText"
+                               Foreground="#9C9C9C"
+                               FontSize="11"
+                               Margin="0,6,0,12"
+                               TextTrimming="CharacterEllipsis" />
 
-            <TextBox x:Name="LabelBox" Style="{StaticResource DarkTextBox}" MaxLength="24" />
+                    <TextBox x:Name="LabelBox" Style="{StaticResource DarkTextBox}" MaxLength="24" />
 
-            <TextBlock Text="颜色" Foreground="#8F8F8F" FontSize="11" Margin="1,12,0,6" />
-            <WrapPanel x:Name="Swatches" />
+                    <TextBlock Text="颜色" Foreground="#8F8F8F" FontSize="11" Margin="1,12,0,6" />
+                    <WrapPanel x:Name="Swatches" />
 
-            <StackPanel x:Name="CustomPanel" Visibility="Collapsed" Margin="0,8,0,0">
-                <Border Background="#2A2A2A" CornerRadius="8" Padding="10">
-                    <StackPanel>
-                        <Grid x:Name="SvArea"
-                              Height="110"
-                              Background="Transparent"
-                              Cursor="Cross"
-                              ClipToBounds="True"
-                              MouseLeftButtonDown="OnSvMouseDown"
-                              MouseMove="OnSvMouseMove"
-                              MouseLeftButtonUp="OnSvMouseUp"
-                              SizeChanged="OnPickerSizeChanged">
-                            <Rectangle x:Name="SvBase" />
-                            <Rectangle>
-                                <Rectangle.Fill>
-                                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                                        <GradientStop Color="#FFFFFFFF" Offset="0" />
-                                        <GradientStop Color="#00FFFFFF" Offset="1" />
-                                    </LinearGradientBrush>
-                                </Rectangle.Fill>
-                            </Rectangle>
-                            <Rectangle>
-                                <Rectangle.Fill>
-                                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                                        <GradientStop Color="#00000000" Offset="0" />
-                                        <GradientStop Color="#FF000000" Offset="1" />
-                                    </LinearGradientBrush>
-                                </Rectangle.Fill>
-                            </Rectangle>
-                            <Canvas IsHitTestVisible="False">
-                                <Ellipse x:Name="SvThumbRing" Width="14" Height="14" Stroke="#99000000" StrokeThickness="1" />
-                                <Ellipse x:Name="SvThumb" Width="12" Height="12" Stroke="#FFFFFF" StrokeThickness="2" />
-                            </Canvas>
-                        </Grid>
+                    <StackPanel x:Name="CustomPanel" Visibility="Collapsed" Margin="0,8,0,0">
+                        <Border Background="#2A2A2A" CornerRadius="8" Padding="10">
+                            <StackPanel>
+                                <Grid x:Name="SvArea"
+                                      Height="110"
+                                      Background="Transparent"
+                                      Cursor="Cross"
+                                      ClipToBounds="True"
+                                      MouseLeftButtonDown="OnSvMouseDown"
+                                      MouseMove="OnSvMouseMove"
+                                      MouseLeftButtonUp="OnSvMouseUp"
+                                      SizeChanged="OnPickerSizeChanged">
+                                    <Rectangle x:Name="SvBase" />
+                                    <Rectangle>
+                                        <Rectangle.Fill>
+                                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                                <GradientStop Color="#FFFFFFFF" Offset="0" />
+                                                <GradientStop Color="#00FFFFFF" Offset="1" />
+                                            </LinearGradientBrush>
+                                        </Rectangle.Fill>
+                                    </Rectangle>
+                                    <Rectangle>
+                                        <Rectangle.Fill>
+                                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                                <GradientStop Color="#00000000" Offset="0" />
+                                                <GradientStop Color="#FF000000" Offset="1" />
+                                            </LinearGradientBrush>
+                                        </Rectangle.Fill>
+                                    </Rectangle>
+                                    <Canvas IsHitTestVisible="False">
+                                        <Ellipse x:Name="SvThumbRing" Width="14" Height="14" Stroke="#99000000" StrokeThickness="1" />
+                                        <Ellipse x:Name="SvThumb" Width="12" Height="12" Stroke="#FFFFFF" StrokeThickness="2" />
+                                    </Canvas>
+                                </Grid>
 
-                        <Grid x:Name="HueBar"
-                              Height="12"
-                              Margin="0,10,0,0"
-                              Background="Transparent"
-                              Cursor="Hand"
-                              MouseLeftButtonDown="OnHueMouseDown"
-                              MouseMove="OnHueMouseMove"
-                              MouseLeftButtonUp="OnHueMouseUp"
-                              SizeChanged="OnPickerSizeChanged">
-                            <Border CornerRadius="6">
-                                <Border.Background>
-                                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                                        <GradientStop Color="#FF0000" Offset="0" />
-                                        <GradientStop Color="#FFFF00" Offset="0.1667" />
-                                        <GradientStop Color="#00FF00" Offset="0.3333" />
-                                        <GradientStop Color="#00FFFF" Offset="0.5" />
-                                        <GradientStop Color="#0000FF" Offset="0.6667" />
-                                        <GradientStop Color="#FF00FF" Offset="0.8333" />
-                                        <GradientStop Color="#FF0000" Offset="1" />
-                                    </LinearGradientBrush>
-                                </Border.Background>
-                            </Border>
-                            <Canvas IsHitTestVisible="False">
-                                <Border x:Name="HueThumb"
-                                        Width="4"
-                                        Height="16"
-                                        CornerRadius="2"
-                                        Background="#FFFFFF"
-                                        BorderBrush="#99000000"
-                                        BorderThickness="1" />
-                            </Canvas>
-                        </Grid>
+                                <Grid x:Name="HueBar"
+                                      Height="12"
+                                      Margin="0,10,0,0"
+                                      Background="Transparent"
+                                      Cursor="Hand"
+                                      MouseLeftButtonDown="OnHueMouseDown"
+                                      MouseMove="OnHueMouseMove"
+                                      MouseLeftButtonUp="OnHueMouseUp"
+                                      SizeChanged="OnPickerSizeChanged">
+                                    <Border CornerRadius="6">
+                                        <Border.Background>
+                                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                                <GradientStop Color="#FF0000" Offset="0" />
+                                                <GradientStop Color="#FFFF00" Offset="0.1667" />
+                                                <GradientStop Color="#00FF00" Offset="0.3333" />
+                                                <GradientStop Color="#00FFFF" Offset="0.5" />
+                                                <GradientStop Color="#0000FF" Offset="0.6667" />
+                                                <GradientStop Color="#FF00FF" Offset="0.8333" />
+                                                <GradientStop Color="#FF0000" Offset="1" />
+                                            </LinearGradientBrush>
+                                        </Border.Background>
+                                    </Border>
+                                    <Canvas IsHitTestVisible="False">
+                                        <Border x:Name="HueThumb"
+                                                Width="4"
+                                                Height="16"
+                                                CornerRadius="2"
+                                                Background="#FFFFFF"
+                                                BorderBrush="#99000000"
+                                                BorderThickness="1" />
+                                    </Canvas>
+                                </Grid>
 
-                        <DockPanel Margin="0,10,0,0">
-                            <Border x:Name="HexPreview"
-                                    DockPanel.Dock="Right"
-                                    Width="28"
-                                    Height="28"
-                                    CornerRadius="7"
-                                    Margin="8,0,0,0"
-                                    BorderBrush="#33FFFFFF"
-                                    BorderThickness="1" />
-                            <TextBox x:Name="HexBox"
-                                     Style="{StaticResource DarkTextBox}"
-                                     MaxLength="7"
-                                     Padding="8,4"
-                                     FontFamily="Consolas, Microsoft YaHei UI"
-                                     TextChanged="OnHexTextChanged"
-                                     LostFocus="OnHexLostFocus" />
-                        </DockPanel>
+                                <DockPanel Margin="0,10,0,0">
+                                    <Border x:Name="HexPreview"
+                                            DockPanel.Dock="Right"
+                                            Width="28"
+                                            Height="28"
+                                            CornerRadius="7"
+                                            Margin="8,0,0,0"
+                                            BorderBrush="#33FFFFFF"
+                                            BorderThickness="1" />
+                                    <TextBox x:Name="HexBox"
+                                             Style="{StaticResource DarkTextBox}"
+                                             MaxLength="7"
+                                             Padding="8,4"
+                                             FontFamily="Consolas, Microsoft YaHei UI"
+                                             TextChanged="OnHexTextChanged"
+                                             LostFocus="OnHexLostFocus" />
+                                </DockPanel>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
-                </Border>
-            </StackPanel>
 
-            <DockPanel Margin="0,14,0,0">
+                    <TextBlock Text="位置"
+                               Foreground="#8F8F8F"
+                               FontSize="11"
+                               Margin="1,14,0,6" />
+                    <UniformGrid x:Name="PositionGrid" Columns="3" />
+
+                    <TextBlock Text="大小"
+                               Foreground="#8F8F8F"
+                               FontSize="11"
+                               Margin="1,10,0,6" />
+                    <UniformGrid x:Name="SizeGrid" Columns="4" />
+
+                    <DockPanel Margin="0,8,0,0">
+                        <TextBlock x:Name="LayoutSummary"
+                                   DockPanel.Dock="Right"
+                                   Foreground="#9C9C9C"
+                                   FontSize="11"
+                                   VerticalAlignment="Center" />
+                        <Button x:Name="ResetLayoutButton"
+                                Content="恢复默认"
+                                Style="{StaticResource ChipButton}"
+                                Padding="10,4"
+                                HorizontalAlignment="Left"
+                                ToolTip="恢复右上默认位置与 100% 大小" />
+                    </DockPanel>
+                </StackPanel>
+            </ScrollViewer>
+
+            <DockPanel Grid.Row="2" Margin="0,14,0,0">
                 <Button x:Name="SaveButton"
                         DockPanel.Dock="Right"
                         Content="保存"
@@ -238,6 +304,6 @@
                         Foreground="#FF9B9B"
                         Background="#2A2222" />
             </DockPanel>
-        </StackPanel>
+        </Grid>
     </Border>
 </Window>
