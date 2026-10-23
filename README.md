@@ -22,10 +22,15 @@
 
 > 当前为 `0.1.0` 早期版本，界面为简体中文。
 
+## 下载安装
+
+从 [Releases](https://github.com/jinksw/windowmark/releases/latest) 下载 `WindowMark-<版本>-win-x64.exe`，双击即可运行，无需安装 .NET。发布包是自包含单文件，约 63 MB。
+
+程序未做代码签名，首次运行时 Windows SmartScreen 可能提示“已保护你的电脑”，点击“更多信息 → 仍要运行”即可。
+
 ## 系统要求
 
 - Windows 10 / Windows 11，x64（在 Windows 11 + 150% 缩放下实测通过）
-- 运行：.NET 8 Desktop Runtime (x64)
 - 构建：.NET 8 SDK
 
 ## 构建与运行
@@ -41,11 +46,13 @@ dotnet run --project WindowMark.csproj
 .\bin\Release\net8.0-windows\WindowMark.exe
 ```
 
-可选：生成框架依赖的单文件版本（目标机器需安装 .NET 8 Desktop Runtime）：
+发布自包含单文件版本（与 Releases 中的产物一致，目标机器无需安装 .NET）：
 
 ```powershell
-dotnet publish WindowMark.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true
+dotnet publish WindowMark.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
 ```
+
+推送 `v*` 形式的 tag 时，[release workflow](.github/workflows/release.yml) 会自动构建并创建 GitHub Release。
 
 ## 使用
 

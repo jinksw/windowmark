@@ -22,10 +22,15 @@ When several chat windows, editors, or terminals are open at once, they often lo
 
 > WindowMark is at an early `0.1.0` stage. The user interface is currently in Simplified Chinese.
 
+## Download
+
+Get `WindowMark-<version>-win-x64.exe` from [Releases](https://github.com/jinksw/windowmark/releases/latest) and run it — no .NET installation required. The release is a self-contained single file of about 63 MB.
+
+The executable is not code-signed, so Windows SmartScreen may show "Windows protected your PC" on first launch. Click "More info → Run anyway".
+
 ## Requirements
 
 - Windows 10 / Windows 11, x64 (tested on Windows 11 at 150% scaling)
-- To run: .NET 8 Desktop Runtime (x64)
 - To build: .NET 8 SDK
 
 ## Build and run
@@ -41,11 +46,13 @@ Or launch the built executable directly:
 .\bin\Release\net8.0-windows\WindowMark.exe
 ```
 
-Optional: create a framework-dependent single-file build (the target machine still needs the .NET 8 Desktop Runtime):
+Create the self-contained single-file build used by Releases (the target machine needs no .NET installation):
 
 ```powershell
-dotnet publish WindowMark.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true
+dotnet publish WindowMark.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
 ```
+
+Pushing a `v*` tag makes the [release workflow](.github/workflows/release.yml) build and publish a GitHub Release automatically.
 
 ## Usage
 
